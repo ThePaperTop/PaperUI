@@ -2,8 +2,8 @@ from distutils.core import setup
 
 setup(
     name="paperui",
-    version="0.1",
+    version="0.14",
     license="MIT",
-    modules=["paperui"],
+    packages=["paperui", "paperui.special"],
     long_description=open("README.md").read())
 

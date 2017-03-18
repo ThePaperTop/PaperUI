@@ -3,33 +3,12 @@ from datetime import date, datetime
 from threading import Thread
 
 from paperui.key_events import ExclusiveKeyReader
-from paperui.core import ScreenDrawer
+from paperui.core import *
 from enums import enum
 from paperui.keyboard import KeyTranslator
 from paperui.text_wrapper import TextWrapper
 
 align = enum(left=-1, center=0, right=1)
-directions = enum(x=0, y=1)
-
-char_width = 9.0
-char_height = 18.0
-line_width = 4.0
-
-def chars_to_pixels(chars, direction=directions.x):
-    if direction == directions.x:
-        return chars * char_width
-    elif direction == directions.y:
-        return chars * char_height
-    else:
-        raise Exception("Direction must be x or y.")
-
-def pixels_to_chars(pixels, direction=directions.x):
-    if direction == directions.x:
-        return math.floor(pixels / char_width)
-    elif direction == directions.y:
-        return math.floor(pixels / char_height)
-    else:
-        raise Exception("Direction must be x or y.")
 
 def visible_text(text, writable_length, alignment=align.left):
     if len(text) < writable_length:
