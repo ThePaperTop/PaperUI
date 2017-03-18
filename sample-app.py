@@ -81,14 +81,31 @@ def save_data(f, c, data):
     entry_form.focus(entry_form.control("first-name"))
 
 def close_form(f, c, data):
-    f.finish()
+    f.show_popup = True
+    # f.finish()
 
 def next_form(f, c, data):
     f.finish()
     
+popup = Popup(contents=[Label(text="Adding record now."),
+                        Spacer(height=100),
+                        Button(text="Dismiss",
+                               name="dismiss-button")],
+              width=400,
+              height=200,
+              owner=entry_form)
+
+def hide_popup(f, c, d):
+    entry_form.show_popup = False
+    entry_form.finish()
     
+popup.control("dismiss-button").connect("clicked",
+                                        hide_popup)
+             
 entry_form.control("save-button").connect("clicked", save_data)
 entry_form.control("done-button").connect("clicked", close_form)
+entry_form.popup = popup
+
 summary_form.control("done-button").connect("clicked", close_form)
 summary_form.control("done-button").connect("clicked", lambda f, c, data: f.drawer.clear())
 

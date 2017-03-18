@@ -113,6 +113,34 @@ class Container(Connectable, object):
                 if item.name == name:
                     return item
         return None
+    
+    def focus(self, control):
+        for child in self.tab_order:
+            child.focused = False
+                
+        control.focused = True
+        
+        self.focused_control = control
+
+        self.owner.dirty = True
+
+    def focus_next(self):
+        if self.focused_control == self.tab_order[-1]:
+            self.focus(self.tab_order[0])
+        else:
+            self.focus(self.tab_order[
+                self.tab_order.index(self.focused_control) + 1
+            ])
+        self.owner.dirty = True
+
+    def focus_prev(self):
+        if self.focused_control == self.tab_order[0]:
+            self.focus(self.tab_order[-1])
+        else:
+            self.focus(self.tab_order[
+                self.tab_order.index(self.focused_control) - 1
+            ])
+        self.owner.dirty=True
 
 class Spacer(Container):
     def __init__(self, height=9, line=False):
@@ -478,6 +506,7 @@ class Row(Container):
         Container.__init__(self, contents)
 
     def do_layout(self, x, y, width, height, owner=None):
+        self.owner = owner
         item_width = math.floor(width / len(self.contents))
         
         for child_index in range(len(self.contents)):
@@ -499,6 +528,7 @@ class Column(Container):
         Container.__init__(self, contents)
 
     def do_layout(self, x, y, width, height, owner=None):
+        self.owner = owner
         self.width = width
         self.height = 0
         for child in self.contents:
@@ -512,7 +542,35 @@ class Column(Container):
                 child.owner = owner
                 
             self.height += child.height
-            
+
+class Popup(Column):
+    def __init__(self, width, height, contents=list(), owner=None):
+        Column.__init__(self, contents=contents)
+        self.width = width
+        self.height = height
+        self.owner = owner
+        try:
+            self.focus(self.tab_order[0])
+        except AttributeError:
+            pass
+
+    def do_layout(self, x, y, width, height, owner=None):
+        self.owner = owner
+        self.x = math.floor(owner.width / 2 - self.width / 2)
+        self.y = math.floor(owner.height / 2 - self.height / 2)
+        
+        Column.do_layout(self, self.x, self.y, self.width, self.height, owner=self)
+
+    def draw_contents(self, drawer):
+        drawer.rectangle(self.x + 1, self.y + 1,
+                         self.width + self.x - 2,
+                         self.height + self.y - 1)
+        Container.draw_contents(self, drawer)
+        try:
+            self.focused_control.draw_interaction(drawer)
+        except AttributeError:
+            pass
+
         
         
 class Form(Container):
@@ -543,6 +601,32 @@ class Form(Container):
         self._dirty = True
         self._dirty_time = datetime.fromordinal(1)
         self._last_draw = datetime.fromordinal(1)
+
+        self._popup = None
+        self._show_popup = False
+
+    @property
+    def popup(self):
+        return self._popup
+
+    @popup.setter
+    def popup(self, new_popup):
+        new_popup.do_layout(0, 0, self.width, self.height, self)
+        self._popup = new_popup
+
+    @property
+    def show_popup(self):
+        return self._show_popup
+
+    @show_popup.setter
+    def show_popup(self, value):
+        if value and not self._popup:
+            raise Exception("Form has no popup to show.")
+            
+        if value != self._show_popup:
+            self.dirty = True    
+        
+        self._show_popup = value
         
     @property
     def dirty(self):
@@ -557,33 +641,8 @@ class Form(Container):
         self.finished = True
         self.keyboard.stop()
         
-    def focus(self, control):
-        for child in self.tab_order:
-            child.focused = False
-                
-        control.focused = True
-        
-        self.focused_control = control
-
-        self.dirty = True
-
-    def focus_next(self):
-        if self.focused_control == self.tab_order[-1]:
-            self.focus(self.tab_order[0])
-        else:
-            self.focus(self.tab_order[
-                self.tab_order.index(self.focused_control) + 1
-            ])
-        self.dirty = True
-
-    def focus_prev(self):
-        if self.focused_control == self.tab_order[0]:
-            self.focus(self.tab_order[-1])
-        else:
-            self.focus(self.tab_order[
-                self.tab_order.index(self.focused_control) - 1
-            ])
     def do_layout(self):
+        self.owner = self
         next_y = 0
 
         for child in self.contents:
@@ -614,6 +673,10 @@ class Form(Container):
                     self.focused_control.draw_interaction(drawer)
                 except AttributeError:
                     pass
+
+                if self.show_popup:
+                    self.popup.draw_contents(drawer)
+                
                 drawer.send()
         exit()
 
@@ -625,17 +688,19 @@ class Form(Container):
 
     def handle_key(self, keycode, keystate):
         char, code = self.key_translator.translate(keycode, keystate)
-        
+
+        focused_form = self.show_popup and self.popup or self
+            
         if code == "KEY_F12":
             self.finish()
         elif code == "KEY_PAUSE":
             exit()
         elif char == "\t":
-            self.focus_next()
+            focused_form.focus_next()
         elif code == "S-KEY_TAB":
-            self.focus_prev()
+            focused_form.focus_prev()
         elif char or code:
-            self.focused_control.handle_key(char, code)
+            focused_form.focused_control.handle_key(char, code)
 
     def run(self, keyboard, screen):
         self.keyboard = keyboard
