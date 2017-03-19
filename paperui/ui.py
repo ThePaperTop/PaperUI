@@ -553,13 +553,24 @@ class Popup(Column):
             self.focus(self.tab_order[0])
         except AttributeError:
             pass
+        self._dirty = True
+
+    @property
+    def dirty(self):
+        return self._dirty
+
+    @dirty.setter
+    def dirty(self, value):
+        self._dirty = value
+        if self._dirty:
+            self.owner.dirty = True
 
     def do_layout(self, x, y, width, height, owner=None):
         self.owner = owner
         self.x = math.floor(owner.width / 2 - self.width / 2)
         self.y = math.floor(owner.height / 2 - self.height / 2)
         
-        Column.do_layout(self, self.x, self.y, self.width, self.height, owner=self)
+        Column.do_layout(self, self.x, self.y, self.width, self.height, owner=self.owner)
 
     def draw_contents(self, drawer):
         drawer.rectangle(self.x + 1, self.y + 1,
@@ -570,7 +581,6 @@ class Popup(Column):
             self.focused_control.draw_interaction(drawer)
         except AttributeError:
             pass
-
         
         
 class Form(Container):
@@ -689,8 +699,11 @@ class Form(Container):
     def handle_key(self, keycode, keystate):
         char, code = self.key_translator.translate(keycode, keystate)
 
-        focused_form = self.show_popup and self.popup or self
-            
+        if self.show_popup:
+            focused_form = self.popup
+        else:
+            focused_form = self
+
         if code == "KEY_F12":
             self.finish()
         elif code == "KEY_PAUSE":
