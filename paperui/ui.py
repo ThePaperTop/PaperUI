@@ -615,6 +615,8 @@ class Form(Container):
         self._popup = None
         self._show_popup = False
 
+        self.keybindings = {}
+
     @property
     def popup(self):
         return self._popup
@@ -712,8 +714,31 @@ class Form(Container):
             focused_form.focus_next()
         elif code == "S-KEY_TAB":
             focused_form.focus_prev()
+        elif self._handled_by_keybinding(code):
+            pass
         elif char or code:
             focused_form.focused_control.handle_key(char, code)
+
+    def _handled_by_keybinding(self, code):
+        try:
+            events = self.keybindings[code]
+        except KeyError:
+            return False
+
+        for event in events:
+            try:
+                event(self, self.focused_control, code)
+            except Exception as e:
+                print("Error in key handler for code %s:\n\n%s" % (code, e))
+                      
+        return True
+                      
+    def bind_key(self, code, event):
+        try:
+            self.keybindings[code].append(event)
+        except:
+            self.keybindings[code] = [event]
+        
 
     def run(self, keyboard, screen):
         self.keyboard = keyboard
