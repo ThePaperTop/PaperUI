@@ -225,10 +225,11 @@ class Entry(Widget):
         elif code:
             if code == "KEY_BACKSPACE":
                 if self.cursor_pos > 0:
+                    old_pos = self.cursor_pos
                     self.text = (self.text[:self.cursor_pos - 1] +
                                   self.text[self.cursor_pos:])
                     self.fire("text-changed", self._text)
-                    self.cursor_pos -= 1
+                    self.cursor_pos = old_pos - 1
                     self.redraw()
                 return True
             elif code == "KEY_ENTER":
@@ -544,15 +545,21 @@ class Column(Container):
             self.height += child.height
 
 class Popup(Column):
-    def __init__(self, width, height, contents=list(), owner=None):
-        Column.__init__(self, contents=contents)
+    def __init__(self, width, title="Popup", contents=list(), owner=None):
+
+        self.title_label = Label(text=title)
+        
+        Column.__init__(self, contents=[self.title_label] + contents)
+        
         self.width = width
-        self.height = height
+        self.height = 0
         self.owner = owner
+        
         try:
             self.focus(self.tab_order[0])
         except AttributeError:
             pass
+        
         self._dirty = True
 
     @property
@@ -567,16 +574,25 @@ class Popup(Column):
 
     def do_layout(self, x, y, width, height, owner=None):
         self.owner = owner
+
         self.x = math.floor(owner.width / 2 - self.width / 2)
+
+        # do layout once to figure height of all contents
+        Column.do_layout(self, self.x, y, self.width, self.height, owner=self.owner)
+
+        # figure y based on finalized height
         self.y = math.floor(owner.height / 2 - self.height / 2)
-        
+
+        # redo layout with corrected position
         Column.do_layout(self, self.x, self.y, self.width, self.height, owner=self.owner)
 
     def draw_contents(self, drawer):
         drawer.rectangle(self.x + 1, self.y + 1,
                          self.width + self.x - 2,
                          self.height + self.y - 1)
+        
         Container.draw_contents(self, drawer)
+        
         try:
             self.focused_control.draw_interaction(drawer)
         except AttributeError:
@@ -714,6 +730,8 @@ class Form(Container):
             focused_form.focus_next()
         elif code == "S-KEY_TAB":
             focused_form.focus_prev()
+        elif code == "KEY_ESC":
+            self.show_popup = False
         elif self._handled_by_keybinding(code):
             pass
         elif char or code:

@@ -39,10 +39,19 @@ class Page(list):
         return "\n".join([line.text
                           for line in self])
         
-        
+def max_char_width(font):
+    max_width = 0
+    for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!@#$%^&*()_+-={}[]\\|:;\"'<>,.~`":
+        width = font.getsize(c)[0]
+        if width > max_width:
+            max_width = width
+
+    return max_width
+
 class Paginator(object):
     def __init__(self, font, size, margin=20):
         self.font = font
+        self.max_char_width = max_char_width(self.font)
         self.size = size
         self.pages = []
         self.page = Page(self.size)
@@ -62,16 +71,22 @@ class Paginator(object):
         lastsize, newsize = (0, 0), (0, 0)
 
         for word in words:
-            newsize = self.font.getsize(" ".join(acc + [word]))
-            if newsize[0] > max_width:
-                offsets = self.font.getoffset(" ".join(acc))
-                lastsize = (lastsize[0], lastsize[1] + offsets[1])
-                lines.append(Line(" ".join(acc), lastsize))
-                acc = [word]
-                lastsize, newsize = (0,0), (0,0)
-            else:
+            # if the line would fit if all characters were as big as
+            # the widest, just add the word
+            if len(" ".join(acc + [word])) < math.floor(self.size[0] / self.max_char_width):
                 acc.append(word)
-                lastsize = newsize
+            else:
+                # otherwise, test for fit
+                newsize = self.font.getsize(" ".join(acc + [word]))
+                if newsize[0] > max_width:
+                    offsets = self.font.getoffset(" ".join(acc))
+                    lastsize = (lastsize[0], lastsize[1] + offsets[1])
+                    lines.append(Line(" ".join(acc), lastsize))
+                    acc = [word]
+                    lastsize, newsize = (0,0), (0,0)
+                else:
+                    acc.append(word)
+                    lastsize = newsize
 
         if acc: # if there is a partial line left
             lines.append(Line(" ".join(acc),
@@ -115,7 +130,7 @@ class PaginatorWidget(Paginator, ui.Widget):
         width = 800
 
         Paginator.__init__(self, font, [width, height], margin)
-        ui.Widget.__init__(self, name)
+        ui.Widget.__init__(self, name=name)
 
         self.size = [width, height]
         self._text = ""
@@ -204,54 +219,12 @@ class PaginatorWidget(Paginator, ui.Widget):
 
 
 if __name__ == "__main__":
-    import sys
-    import codecs
+    import sys, codecs
+    from fontlist import FontList
     
-    from argparse import ArgumentParser
-    
-    from paperui.ui import ExclusiveKeyReader
-    from fc_list import FontList
-
-    parser = ArgumentParser()
-    parser.add_argument("filename", help="The text file to display")
-    parser.add_argument("-g", "--gutenberg", help="Use settings appropriate for Project Gutenberg plain text e-books, i.e. `-s -b 2`", action="store_true")
-    parser.add_argument("-b", "--breaks", help="The number of newline characters that indicate a paragraph break", type=int, default=1)
-    parser.add_argument("-s", "--strip", help="Strip leading whitespace before wrapping", action="store_true")
-
-    args = parser.parse_args()
-    if args.gutenberg:
-        args.breaks = 2
-        args.strip = True
-    
-    font = FontList.all().by_style("Book").by_partial_name("dejavu serif")[1]
-    fn = args.filename
-
-    with codecs.open(fn, "r", "utf-8") as f:
-        book = f.readlines()
-
-    if args.strip:
-        book = [s.strip(" \t")
-                for s in book]
-
-    if args.breaks == 1:
-        book = "".join(book)
-    else:
-        book = " ".join([line.strip() == "" and "\n\n" or line.strip("\n")
-                         for line in book])
-    
-    drawer = ScreenDrawer()
-
-    pw = PaginatorWidget(name="test-widget",
-                         text=book,
-                         font=ImageFont.truetype(font["path"],
-                                                 size=18),
-                         rows=drawer.rows())
-
-    frm = ui.Form(pw)
-
-    with ExclusiveKeyReader("/dev/input/event0") as keyboard:
-        frm.run(keyboard, drawer)
-
-    # p = Paginator(ImageFont.truetype(font["path"], 18), (800, 480))
-    # p.paginate(book)
-    # print(p.pages)
+    fonts = FontList.all().by_partial_name("dejavu serif").regular()
+    font = ImageFont.truetype(fonts[1]["path"])
+    paginator = Paginator(font, (800, 480))
+    text = codecs.open(sys.argv[1], "r", "utf-8").read()
+    paginator.paginate(text)
+    print(len(paginator.pages))
