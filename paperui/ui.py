@@ -622,7 +622,11 @@ class Form(Container):
         self.do_layout()
 
         self.finished = False
-        self.focus(self.tab_order[0])
+        
+        try:
+            self.focus(self.tab_order[0])
+        except:
+            pass
 
         self._dirty = True
         self._dirty_time = datetime.fromordinal(1)
@@ -732,12 +736,25 @@ class Form(Container):
             focused_form.focus_prev()
         elif code == "KEY_ESC":
             self.show_popup = False
-        elif self._handled_by_keybinding(code):
+        elif self._handled_by_keybinding(char, code):
+            pass
+        elif self._handled_by_container(char, code):
             pass
         elif char or code:
             focused_form.focused_control.handle_key(char, code)
 
-    def _handled_by_keybinding(self, code):
+    def _handled_by_container(self, char, code):
+        if self.show_popup:
+            focused_form = self.popup
+        else:
+            focused_form = self
+            
+        try:
+            return focused_form.focused_control.owner.handle_key(char, code)
+        except AttributeError:
+            return False
+        
+    def _handled_by_keybinding(self, char, code):
         try:
             events = self.keybindings[code]
         except KeyError:

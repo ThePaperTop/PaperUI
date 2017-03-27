@@ -11,7 +11,7 @@ except ImportError:
 
 from PIL import Image, ImageFont, ImageDraw
 from pil2epd import convert
-from fc_list import FontList
+from fontlist import FontList
 from enums import enum
 
 directions = enum(x=0, y=1)
@@ -42,7 +42,9 @@ class ScreenDrawer(object):
         self.size = (width, height)
 
         try:
-            font = FontList.all().by_partial_name("roboto mono").bold()[0]
+            fonts = FontList.all().by_partial_name("roboto mono").bold()
+            font = [font for font in fonts
+                    if font not in fonts.slanted()][0]
         except IndexError:
             raise Exception("You must install the Roboto Mono font.")
         
